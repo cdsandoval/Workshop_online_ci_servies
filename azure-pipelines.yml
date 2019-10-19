@@ -1,0 +1,140 @@
+name: "NetCoreC++"
+
+trigger:
+  branches:
+    include:
+    - NetCoreC++
+
+
+variables:
+  solution: '**/PostNetCoreNativo.sln'
+  buildConfiguration: 'Release'
+  testProject: '**/NativeMehotdsTests.csproj'
+
+jobs:
+- job: 'Windows'
+  strategy:
+    matrix:
+      Visual Studio 2019:
+        imageName: 'windows-2019'
+        generator: '-G "Visual Studio 16 2019" -A Win64'
+        
+  pool:
+    vmImage: $(imageName)
+
+  displayName: 'NetCore C++'
+  
+  steps:
+  - checkout: self
+    submodules: true
+
+  - script: |
+      cd "src/C++ Library"
+      mkdir -p build
+      cd build
+      cmake  ./..
+    displayName: 'Make'
+    
+  - script: |
+      cd "src/C++ Library/build"
+      cmake --build . --target --config $(buildConfiguration)
+    displayName: 'Compile'
+       
+  - task: DotNetCoreInstaller@0
+    displayName: 'Instalar Net Core'
+    inputs:
+      version: '2.2.103'  
+ 
+  - task: DotNetCoreCLI@2
+    displayName: 'Compilacion'
+    inputs:
+      command: build
+      projects: '$(solution)'
+      arguments: '--configuration $(buildConfiguration)' 
+  
+  - task: CopyFiles@2
+    displayName: 'Copia libreria nativa a directorio de Test'
+    inputs:
+      SourceFolder: 'src/C++ Library/build/$(buildConfiguration)'
+      Contents: 'EjemploNativo.dll'
+      TargetFolder: 'test/NativeMehotdsTests/bin/$(buildConfiguration)/netcoreapp2.1'
+  
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    inputs:
+      command: test
+      projects: '$(testProject)'
+      arguments: '--configuration $(buildConfiguration)'      
+
+  - task: CopyFiles@2
+    displayName: 'Copy Files to: $(build.artifactstagingdirectory)'
+    inputs:
+      SourceFolder: '$(system.defaultworkingdirectory)'
+      Contents: '**\bin\$(BuildConfiguration)\**'
+      TargetFolder: '$(build.artifactstagingdirectory)'
+    condition: succeededOrFailed()    
+  
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact'
+    inputs:
+      PathtoPublish: '$(build.artifactstagingdirectory)'
+    condition: succeededOrFailed()
+
+- job: 'cpp'
+
+  strategy:
+    matrix:
+      High Sierra:
+        imageName: 'macos-10.13'
+      Mojave:
+        imageName: 'macos-10.14'
+      Ubuntu:
+        imageName: 'ubuntu-16.04'
+        
+  pool:
+    vmImage: $(imageName)
+
+  displayName: 'NetCore C++'
+  
+  steps:
+  - checkout: self
+    submodules: true
+
+  - script: |
+      cd "src/C++ Library"
+      mkdir -p build
+      cd build
+      cmake  ./..
+    displayName: 'Make'
+    
+  - script: |
+      cd "src/C++ Library/build"
+      cmake --build . --target --config $(buildConfiguration)
+    displayName: 'Compile'
+      
+  - task: DotNetCoreInstaller@0
+    displayName: 'Instalar Net Core'
+    inputs:
+      version: '2.2.103'  
+  
+  - task: DotNetCoreCLI@2
+    displayName: 'Compilacion'
+    inputs:
+      command: build
+      projects: '$(solution)'
+      arguments: '--configuration $(buildConfiguration)'   
+ 
+  - task: CopyFiles@2
+    displayName: 'Copia libreria nativa a directorio de Test'
+    inputs:
+      SourceFolder: 'src/C++ Library/build'
+      Contents: '*'
+      TargetFolder: 'test/NativeMehotdsTests/bin/$(buildConfiguration)/netcoreapp2.1'       
+  
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    inputs:
+      command: test
+      projects: '$(testProject)'
+      arguments: '--configuration $(buildConfiguration)'      
+     
